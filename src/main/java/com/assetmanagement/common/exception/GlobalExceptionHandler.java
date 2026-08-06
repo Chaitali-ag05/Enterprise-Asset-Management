@@ -2,6 +2,8 @@ package com.assetmanagement.common.exception;
 
 import com.assetmanagement.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,10 +15,17 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(
             ResourceNotFoundException ex,
             HttpServletRequest request) {
+
+        logger.warn("Resource not found: {} | Path: {}",
+                ex.getMessage(),
+                request.getRequestURI());
 
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
@@ -34,6 +43,10 @@ public class GlobalExceptionHandler {
             DuplicateResourceException ex,
             HttpServletRequest request) {
 
+        logger.warn("Duplicate resource: {} | Path: {}",
+                ex.getMessage(),
+                request.getRequestURI());
+
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
@@ -50,6 +63,10 @@ public class GlobalExceptionHandler {
             BadRequestException ex,
             HttpServletRequest request) {
 
+        logger.warn("Bad request: {} | Path: {}",
+                ex.getMessage(),
+                request.getRequestURI());
+
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
@@ -58,7 +75,7 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -72,6 +89,10 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .map(error -> error.getDefaultMessage())
                 .orElse("Validation failed");
+
+        logger.warn("Validation failed: {} | Path: {}",
+                message,
+                request.getRequestURI());
 
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
@@ -89,8 +110,8 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
-        // You can replace this with a logger later
-        ex.printStackTrace();
+        logger.error("Unexpected exception while processing request: {}",
+                request.getRequestURI(), ex);
 
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
@@ -100,6 +121,7 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(response);
     }
 }
