@@ -1,5 +1,7 @@
 package com.assetmanagement.department.service.impl;
 
+import com.assetmanagement.common.exception.DuplicateResourceException;
+import com.assetmanagement.common.exception.ResourceNotFoundException;
 import com.assetmanagement.department.dto.request.DepartmentRequest;
 import com.assetmanagement.department.dto.response.DepartmentResponse;
 import com.assetmanagement.department.entity.Department;
@@ -25,7 +27,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         String name = request.name().trim();
 
         if (departmentRepository.existsByNameIgnoreCase(name)) {
-            throw new RuntimeException("Department already exists");
+            throw new DuplicateResourceException("Department already exists");
         }
 
         Department department = departmentMapper.toEntity(request);
@@ -47,10 +49,10 @@ public class DepartmentServiceImpl implements DepartmentService {
 
     @Override
     public DepartmentResponse getDepartmentById(Long id) {
-        return departmentMapper.toResponse(
-                departmentRepository.findById(id)
-                        .orElseThrow(() -> new RuntimeException("Department not found"))
-        );
+        Department department = departmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+
+        return departmentMapper.toResponse(department);
     }
 
     @Override
