@@ -1,5 +1,6 @@
 package com.assetmanagement.employee.entity.Employee;
 
+import com.assetmanagement.common.entity.BaseEntity;
 import com.assetmanagement.department.entity.Department;
 import com.assetmanagement.employee.entity.Designation;
 import com.assetmanagement.employee.entity.EmployeeStatus.EmployeeStatus;
@@ -13,7 +14,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Employee {
+public class Employee extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,5 +50,4 @@ public class Employee {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")
     private Employee manager;
-
 }

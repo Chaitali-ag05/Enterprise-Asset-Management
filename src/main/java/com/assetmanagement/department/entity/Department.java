@@ -1,5 +1,6 @@
 package com.assetmanagement.department.entity;
 
+import com.assetmanagement.common.entity.BaseEntity;
 import com.assetmanagement.department.enums.DepartmentStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -10,7 +11,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Department {
+public class Department extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

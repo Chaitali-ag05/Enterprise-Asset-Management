@@ -23,6 +23,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     Optional<Employee> findTopByOrderByIdDesc();
 
-    // 👇 Add this
+    Optional<Employee> findByIdAndStatus(Long id, EmployeeStatus status);
+
     List<Employee> findByStatus(EmployeeStatus status);
 }
