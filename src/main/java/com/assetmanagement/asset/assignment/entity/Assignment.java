@@ -1,37 +1,34 @@
 package com.assetmanagement.asset.assignment.entity;
 
 import com.assetmanagement.asset.assignment.enums.AssignmentStatus;
-import com.assetmanagement.asset.entity.Asset;
 import com.assetmanagement.common.entity.BaseEntity;
 import com.assetmanagement.department.entity.Department;
 import com.assetmanagement.employee.entity.Employee.Employee;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "asset_assignment_history")
+@Table(name = "assignments")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AssetAssignmentHistory extends BaseEntity {
+public class Assignment extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "asset_id", nullable = false)
-    private Asset asset;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    // Department of the employee at the time of assignment
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
@@ -39,12 +36,16 @@ public class AssetAssignmentHistory extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime assignedAt;
 
+    private LocalDate expectedReturnDate;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AssignmentStatus assignmentStatus;
+    private AssignmentStatus status;
 
-    private LocalDateTime returnedAt;
+    @Column(length = 1000)
+    private String notes;
 
-    @Column(length = 500)
-    private String remarks;
+    @OneToMany(mappedBy = "assignment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AssignmentItem> items = new ArrayList<>();
 }

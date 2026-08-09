@@ -1,14 +1,21 @@
 package com.assetmanagement.asset.assignment.dto;
 
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
+import java.util.List;
 
 public record AssignmentRequest(
 
         @NotNull(message = "Employee ID is required")
         Long employeeId,
 
-        @Size(max = 500, message = "Remarks cannot exceed 500 characters")
-        String remarks
+        LocalDate expectedReturnDate,
+
+        String notes,
+
+        @NotEmpty(message = "At least one asset is required")
+        List<Long> assetIds
 ) {
 }
