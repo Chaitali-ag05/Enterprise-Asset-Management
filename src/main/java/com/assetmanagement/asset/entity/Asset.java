@@ -5,6 +5,7 @@ import com.assetmanagement.asset.enums.AssetStatus;
 import com.assetmanagement.common.entity.BaseEntity;
 import com.assetmanagement.department.entity.Department;
 import com.assetmanagement.employee.entity.Employee.Employee;
+import com.assetmanagement.vendor.entity.Vendor;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -65,4 +66,10 @@ public class Asset extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_employee_id")
     private Employee assignedEmployee;
+
+    // nullable = false not set here so that existing assets without a vendor don't fail.
+    // New asset creation enforces vendorId at the service layer.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vendor_id")
+    private Vendor vendor;
 }

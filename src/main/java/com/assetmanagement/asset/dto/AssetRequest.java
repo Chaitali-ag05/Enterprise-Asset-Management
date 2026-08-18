@@ -39,6 +39,10 @@ public record AssetRequest(
         @NotNull(message = "Department is required.")
         Long departmentId,
 
-        Long assignedEmployeeId
+        Long assignedEmployeeId,
 
-) {}
+        // vendorId is required for new assets (enforced in service).
+        // It is intentionally excluded from update operations in the service layer.
+        Long vendorId
+
+) {}

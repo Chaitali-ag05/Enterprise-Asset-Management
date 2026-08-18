@@ -14,6 +14,9 @@ import com.assetmanagement.department.repository.DepartmentRepository;
 import com.assetmanagement.employee.entity.Employee.Employee;
 import com.assetmanagement.employee.entity.EmployeeStatus.EmployeeStatus;
 import com.assetmanagement.employee.repository.EmployeeRepository;
+import com.assetmanagement.vendor.entity.Vendor;
+import com.assetmanagement.vendor.enums.VendorStatus;
+import com.assetmanagement.vendor.repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +32,7 @@ public class AssetServiceImpl implements AssetService {
     private final AssetRepository assetRepository;
     private final DepartmentRepository departmentRepository;
     private final EmployeeRepository employeeRepository;
+    private final VendorRepository vendorRepository;
     private final AssetMapper assetMapper;
 
     @Override
@@ -45,6 +49,12 @@ public class AssetServiceImpl implements AssetService {
         Department department = getDepartment(request.departmentId());
 
         Employee employee = getAssignedEmployee(request.assignedEmployeeId());
+
+        // vendorId is required when creating an asset
+        if (request.vendorId() == null) {
+            throw new BadRequestException("Vendor is required when creating an asset.");
+        }
+        Vendor vendor = getActiveVendor(request.vendorId());
 
         AssetStatus status = employee != null
                 ? AssetStatus.ASSIGNED
@@ -64,6 +74,7 @@ public class AssetServiceImpl implements AssetService {
                 .category(request.category())
                 .department(department)
                 .assignedEmployee(employee)
+                .vendor(vendor)
                 .build();
 
         Asset savedAsset = assetRepository.save(asset);
@@ -136,6 +147,8 @@ public class AssetServiceImpl implements AssetService {
         asset.setDepartment(department);
         asset.setAssignedEmployee(employee);
         asset.setStatus(status);
+        // vendor is intentionally NOT updated here.
+        // Once an asset is created with a vendor, the vendor cannot be changed.
 
         return assetMapper.toResponse(assetRepository.save(asset));
     }
@@ -185,6 +198,21 @@ public class AssetServiceImpl implements AssetService {
                         ));
     }
 
+    private Vendor getActiveVendor(Long vendorId) {
+
+        Vendor vendor = vendorRepository.findById(vendorId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Vendor not found."));
+
+        if (vendor.getStatus() != VendorStatus.ACTIVE) {
+            throw new BadRequestException(
+                    "An INACTIVE vendor cannot be assigned to a new asset."
+            );
+        }
+
+        return vendor;
+    }
+
     private void validatePurchaseDates(AssetRequest request) {
 
         if (request.purchaseDate().isAfter(LocalDate.now())) {
@@ -223,4 +251,4 @@ public class AssetServiceImpl implements AssetService {
                 lastNumber + 1
         );
     }
-}
+}

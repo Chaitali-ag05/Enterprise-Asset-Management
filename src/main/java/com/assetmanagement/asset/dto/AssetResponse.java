@@ -38,6 +38,10 @@ public record AssetResponse(
 
         Long assignedEmployeeId,
 
-        String assignedEmployeeName
+        String assignedEmployeeName,
 
-) {}
+        Long vendorId,
+
+        String vendorName
+
+) {}

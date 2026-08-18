@@ -47,7 +47,15 @@ public class AssetMapper {
                         ? asset.getAssignedEmployee().getFirstName()
                         + " "
                         + asset.getAssignedEmployee().getLastName()
+                        : null,
+
+                asset.getVendor() != null
+                        ? asset.getVendor().getId()
+                        : null,
+
+                asset.getVendor() != null
+                        ? asset.getVendor().getName()
                         : null
         );
     }
-}
+}
