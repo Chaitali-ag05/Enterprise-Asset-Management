@@ -17,6 +17,7 @@ import java.util.List;
 @Slf4j
 @Transactional
 public class NotificationServiceImpl implements NotificationService {
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     private final NotificationRepository notificationRepository;
 
@@ -67,6 +68,7 @@ public class NotificationServiceImpl implements NotificationService {
     public NotificationResponse markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + notificationId));
+        identityService.verifyEmployeeMatch(notification.getRecipientId());
         notification.setIsRead(true);
         return toResponse(notificationRepository.save(notification));
     }
@@ -90,3 +92,5 @@ public class NotificationServiceImpl implements NotificationService {
         );
     }
 }
+
+

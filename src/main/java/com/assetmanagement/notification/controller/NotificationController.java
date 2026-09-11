@@ -16,17 +16,19 @@ import java.util.Map;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     /**
      * GET /api/notifications/employee/{employeeId}
      * Retrieve all notifications for an employee.
      * ADMIN and MANAGER can access any employee's notifications.
      * EMPLOYEE and TECHNICIAN roles can only view (but cross-employee restriction
-     * requires User↔Employee link — tracked as a known design gap).
+     * requires Userâ†”Employee link â€” tracked as a known design gap).
      */
     @GetMapping("/employee/{employeeId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<List<NotificationResponse>> getAllForEmployee(@PathVariable Long employeeId) {
+        identityService.verifyEmployeeMatch(employeeId);
         return ResponseEntity.ok(notificationService.getNotificationsForEmployee(employeeId));
     }
 
@@ -37,6 +39,7 @@ public class NotificationController {
     @GetMapping("/employee/{employeeId}/unread")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<List<NotificationResponse>> getUnreadForEmployee(@PathVariable Long employeeId) {
+        identityService.verifyEmployeeMatch(employeeId);
         return ResponseEntity.ok(notificationService.getUnreadNotificationsForEmployee(employeeId));
     }
 
@@ -47,6 +50,7 @@ public class NotificationController {
     @GetMapping("/employee/{employeeId}/count-unread")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<Map<String, Long>> countUnread(@PathVariable Long employeeId) {
+        identityService.verifyEmployeeMatch(employeeId);
         long count = notificationService.countUnread(employeeId);
         return ResponseEntity.ok(Map.of("unreadCount", count));
     }
@@ -68,7 +72,10 @@ public class NotificationController {
     @PutMapping("/employee/{employeeId}/read-all")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<Map<String, Integer>> markAllAsRead(@PathVariable Long employeeId) {
+        identityService.verifyEmployeeMatch(employeeId);
         int count = notificationService.markAllAsRead(employeeId);
         return ResponseEntity.ok(Map.of("markedRead", count));
     }
 }
+
+

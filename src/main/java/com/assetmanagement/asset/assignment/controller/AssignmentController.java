@@ -1,4 +1,5 @@
 package com.assetmanagement.asset.assignment.controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.assetmanagement.asset.assignment.dto.AssignmentItemResponse;
 import com.assetmanagement.asset.assignment.dto.AssignmentRequest;
@@ -18,6 +19,7 @@ import java.util.List;
 public class AssignmentController {
 
     private final AssignmentService assignmentService;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     @PostMapping
     public ResponseEntity<AssignmentResponse> createAssignment(
@@ -38,10 +40,22 @@ public class AssignmentController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')") // Fix IDOR #4: Prevent employees from scraping all assignments
     public ResponseEntity<List<AssignmentResponse>> getAllAssignments() {
 
         return ResponseEntity.ok(
                 assignmentService.getAllAssignments()
+        );
+    }
+
+    @GetMapping("/employee/{employeeId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
+    public ResponseEntity<List<AssignmentResponse>> getAssignmentsByEmployee(
+            @PathVariable Long employeeId) {
+        
+        identityService.verifyEmployeeMatch(employeeId);
+        return ResponseEntity.ok(
+                assignmentService.getAssignmentsByEmployeeId(employeeId)
         );
     }
 
@@ -65,3 +79,7 @@ public class AssignmentController {
         );
     }
 }
+
+
+
+

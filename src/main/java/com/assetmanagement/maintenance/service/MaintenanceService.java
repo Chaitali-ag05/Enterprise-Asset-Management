@@ -18,6 +18,9 @@ public interface MaintenanceService {
     /** Get all maintenance issues in the system. */
     List<MaintenanceIssueResponse> getAllIssues();
 
+    /** Get all issues reported by a specific employee */
+    List<MaintenanceIssueResponse> getIssuesByReporter(Long employeeId);
+
     /**
      * Manager assigns a technician to an issue.
      * Creates a new WorkOrder attempt.

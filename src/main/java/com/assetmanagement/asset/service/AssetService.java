@@ -13,6 +13,8 @@ public interface AssetService {
 
     List<AssetResponse> getAllAssets();
 
+    List<AssetResponse> getAssetsByEmployeeId(Long employeeId);
+
     AssetResponse updateAsset(Long id, AssetRequest request);
 
     void deleteAsset(Long id);

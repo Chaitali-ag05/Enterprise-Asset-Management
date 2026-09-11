@@ -54,6 +54,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/departments/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/analytics/**").hasAnyRole("ADMIN", "MANAGER")
 
+                        // Self profile management: any authenticated user can view and update their own profile
+                        .requestMatchers("/api/employees/me").authenticated()
+
                         // Admin + Manager: employee management (create/update)
                         .requestMatchers(HttpMethod.POST, "/api/employees/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.PUT, "/api/employees/**").hasAnyRole("ADMIN", "MANAGER")

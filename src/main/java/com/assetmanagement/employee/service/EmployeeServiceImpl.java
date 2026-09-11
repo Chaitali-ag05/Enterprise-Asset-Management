@@ -25,6 +25,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final EmployeeMapper employeeMapper;
+    private final com.assetmanagement.auth.repository.UserRepository userRepository;
 
     @Override
     public EmployeeResponse createEmployee(EmployeeRequest request) {
@@ -152,13 +153,73 @@ public class EmployeeServiceImpl implements EmployeeService {
         employeeRepository.save(employee);
     }
 
-    private String generateEmployeeCode() {
+    @Override
+    @Transactional(readOnly = true)
+    public EmployeeResponse getCurrentEmployee(String usernameOrEmail) {
+        String email = usernameOrEmail;
+        com.assetmanagement.auth.entity.User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail).orElse(null);
+        if (user != null && user.getEmail() != null) {
+            email = user.getEmail();
+        }
 
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("No employee profile found for: " + usernameOrEmail));
+        
+        return employeeMapper.toResponse(employee);
+    }
+
+    @Override
+    public EmployeeResponse updateCurrentEmployee(String usernameOrEmail, com.assetmanagement.employee.dto.EmployeeSelfUpdateRequest request) {
+        String email = usernameOrEmail;
+        com.assetmanagement.auth.entity.User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail).orElse(null);
+        if (user != null && user.getEmail() != null) {
+            email = user.getEmail();
+        }
+
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found for: " + usernameOrEmail));
+                
+        if (employee.getStatus() == EmployeeStatus.INACTIVE) {
+            throw new BadRequestException("Inactive employees cannot be updated.");
+        }
+        
+        if (employeeRepository.existsByEmailAndIdNot(request.email(), employee.getId())) {
+            throw new DuplicateResourceException("Email already exists.");
+        }
+        
+        if (employeeRepository.existsByPhoneAndIdNot(request.phone(), employee.getId())) {
+            throw new DuplicateResourceException("Phone number already exists.");
+        }
+        
+        employee.setFirstName(request.firstName());
+        employee.setLastName(request.lastName());
+        employee.setEmail(request.email());
+        employee.setPhone(request.phone());
+        
+        Employee updatedEmployee = employeeRepository.save(employee);
+        
+        // Also update Auth User's email to match if they changed it
+        if (user != null && !user.getEmail().equals(request.email())) {
+            user.setEmail(request.email());
+            userRepository.save(user);
+        }
+        
+        return employeeMapper.toResponse(updatedEmployee);
+    }
+
+    private String generateEmployeeCode() {
         return employeeRepository.findTopByOrderByIdDesc()
                 .map(Employee::getEmployeeCode)
                 .map(code -> {
-                    int number = Integer.parseInt(((String) code).substring(3));
-                    return String.format("EMP%04d", number + 1);
+                    try {
+                        String s = (String) code;
+                        if (s.startsWith("EMP") && s.length() > 3) {
+                            int number = Integer.parseInt(s.substring(3));
+                            return String.format("EMP%04d", number + 1);
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                    return "EMP" + String.format("%04d", System.currentTimeMillis() % 10000);
                 })
                 .orElse("EMP0001");
     }

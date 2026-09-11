@@ -1,0 +1,2 @@
+ALTER TABLE maintenance_issues DROP CONSTRAINT IF EXISTS maintenance_issues_status_check;
+ALTER TABLE maintenance_issues ADD CONSTRAINT maintenance_issues_status_check CHECK (status IN ('REPORTED', 'UNDER_REVIEW', 'IN_PROGRESS', 'REJECTED', 'COMPLETED', 'RESOLVED', 'NOT_REPAIRABLE', 'RESOLVED_RETIRED', 'RESOLVED_REPLACED'));

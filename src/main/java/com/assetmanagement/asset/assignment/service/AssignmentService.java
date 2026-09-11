@@ -14,7 +14,11 @@ public interface AssignmentService {
 
     List<AssignmentResponse> getAllAssignments();
 
+    List<AssignmentResponse> getAssignmentsByEmployeeId(Long employeeId);
+
     AssignmentResponse returnAssignmentItem(Long assignmentId, Long itemId, String remarks);
+    void autoCloseAssetAssignment(Long assetId, String reason);
 
     List<AssignmentItemResponse> getAssignmentItems(Long assignmentId);
 }
+

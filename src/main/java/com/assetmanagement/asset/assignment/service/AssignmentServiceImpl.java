@@ -37,6 +37,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final EmployeeRepository employeeRepository;
     private final AssetRepository assetRepository;
     private final AssignmentMapper assignmentMapper;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     @Override
     public AssignmentResponse createAssignment(AssignmentRequest request) {
@@ -65,6 +66,9 @@ public class AssignmentServiceImpl implements AssignmentService {
 
             if (asset.getStatus() == AssetStatus.RETIRED) {
                 throw new BadRequestException("Retired assets cannot be assigned.");
+            }
+            if (asset.getStatus() == AssetStatus.UNDER_MAINTENANCE) {
+                throw new BadRequestException("Assets under maintenance cannot be assigned.");
             }
 
             if (asset.getStatus() == AssetStatus.ASSIGNED) {
@@ -114,6 +118,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     public AssignmentResponse getAssignmentById(Long id) {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        identityService.verifyEmployeeMatch(assignment.getEmployee().getId());
         return assignmentMapper.toResponse(assignment);
     }
 
@@ -126,10 +131,21 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<AssignmentResponse> getAssignmentsByEmployeeId(Long employeeId) {
+        return assignmentRepository.findByEmployeeIdOrderByIdDesc(employeeId).stream()
+                .map(assignmentMapper::toResponse)
+                .toList();
+    }
+
+    @Override
     public AssignmentResponse returnAssignmentItem(Long assignmentId, Long itemId, String remarks) {
         // STEP 1: Find Assignment
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+                
+        // Fix IDOR #2: Verify ownership
+        identityService.verifyEmployeeMatch(assignment.getEmployee().getId());
 
         // STEP 2: Find AssignmentItem
         AssignmentItem item = assignmentItemRepository.findById(itemId)
@@ -156,7 +172,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         Asset asset = item.getAsset();
         if (asset != null) {
             asset.setAssignedEmployee(null);
-            asset.setStatus(AssetStatus.AVAILABLE);
+            if (asset.getStatus() == AssetStatus.ASSIGNED) {
+                asset.setStatus(AssetStatus.AVAILABLE);
+            }
         }
 
         // STEP 7: Check auto-completion (all items returned)
@@ -177,13 +195,41 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    public void autoCloseAssetAssignment(Long assetId, String reason) {
+        Asset asset = assetRepository.findById(assetId).orElse(null);
+        if (asset == null) return;
+        
+        assignmentItemRepository.findByAssetAndStatus(asset, com.assetmanagement.asset.assignment.enums.AssignmentItemStatus.ASSIGNED)
+            .ifPresent(item -> {
+                item.setStatus(com.assetmanagement.asset.assignment.enums.AssignmentItemStatus.RETURNED);
+                item.setReturnedAt(java.time.LocalDateTime.now());
+                item.setRemarks(reason);
+                assignmentItemRepository.save(item);
+                
+                Assignment assignment = item.getAssignment();
+                boolean allReturned = assignment.getItems().stream()
+                        .allMatch(i -> i.getStatus() == com.assetmanagement.asset.assignment.enums.AssignmentItemStatus.RETURNED);
+        
+                if (allReturned) {
+                    assignment.setStatus(com.assetmanagement.asset.assignment.enums.AssignmentStatus.COMPLETED);
+                    assignmentRepository.save(assignment);
+                }
+            });
+    }
+    @Override
     public List<AssignmentItemResponse> getAssignmentItems(Long assignmentId) {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        identityService.verifyEmployeeMatch(assignment.getEmployee().getId());
 
         return assignmentItemRepository.findByAssignmentOrderByIdAsc(assignment).stream()
                 .map(assignmentMapper::toItemResponse)
                 .toList();
     }
 }
+
+
+
+
+
+

@@ -21,5 +21,7 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
 
     List<Asset> findByStatusNot(AssetStatus status);
 
+    List<Asset> findByAssignedEmployeeId(Long employeeId);
+
     Optional<Asset> findByAssetCode(String assetCode);
 }

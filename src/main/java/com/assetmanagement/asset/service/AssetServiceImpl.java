@@ -34,6 +34,7 @@ public class AssetServiceImpl implements AssetService {
     private final EmployeeRepository employeeRepository;
     private final VendorRepository vendorRepository;
     private final AssetMapper assetMapper;
+    private final com.assetmanagement.asset.assignment.service.AssignmentService assignmentService;
 
     @Override
     public AssetResponse createAsset(AssetRequest request) {
@@ -98,6 +99,15 @@ public class AssetServiceImpl implements AssetService {
     public List<AssetResponse> getAllAssets() {
 
         return assetRepository.findByStatusNot(AssetStatus.RETIRED)
+                .stream()
+                .map(assetMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AssetResponse> getAssetsByEmployeeId(Long employeeId) {
+        return assetRepository.findByAssignedEmployeeId(employeeId)
                 .stream()
                 .map(assetMapper::toResponse)
                 .toList();
@@ -231,24 +241,24 @@ public class AssetServiceImpl implements AssetService {
     }
 
     private String generateAssetCode() {
-
         Asset lastAsset = assetRepository
                 .findTopByOrderByIdDesc()
                 .orElse(null);
 
-        if (lastAsset == null) {
+        if (lastAsset == null || lastAsset.getAssetCode() == null) {
             return "AST0001";
         }
 
         String lastCode = lastAsset.getAssetCode();
+        try {
+            if (lastCode.startsWith("AST") && lastCode.length() > 3) {
+                int lastNumber = Integer.parseInt(lastCode.substring(3));
+                return String.format("AST%04d", lastNumber + 1);
+            }
+        } catch (NumberFormatException ignored) {
+        }
 
-        int lastNumber = Integer.parseInt(
-                lastCode.substring(3)
-        );
-
-        return String.format(
-                "AST%04d",
-                lastNumber + 1
-        );
+        return "AST" + String.format("%04d", (lastAsset.getId() != null ? lastAsset.getId() + 1 : 1));
     }
 }
+

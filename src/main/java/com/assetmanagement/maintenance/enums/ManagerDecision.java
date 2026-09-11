@@ -6,5 +6,8 @@ public enum ManagerDecision {
     RETIRE,
 
     /** Replace the non-repairable asset with a new one. */
-    REPLACE
+    REPLACE,
+
+    /** Verify and approve a successfully completed repair. */
+    APPROVE_REPAIR
 }

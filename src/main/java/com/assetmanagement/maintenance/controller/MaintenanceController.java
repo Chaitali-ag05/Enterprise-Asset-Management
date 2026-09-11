@@ -13,12 +13,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 @RestController
 @RequestMapping("/api/maintenance")
 @RequiredArgsConstructor
 public class MaintenanceController {
 
     private final MaintenanceService maintenanceService;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     // ----------------------------------------------------------------
     // ISSUE ENDPOINTS
@@ -42,6 +45,7 @@ public class MaintenanceController {
      * Get all maintenance issues.
      */
     @GetMapping("/issues")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'TECHNICIAN')")
     public ResponseEntity<List<MaintenanceIssueResponse>> getAllIssues() {
         return ResponseEntity.ok(maintenanceService.getAllIssues());
     }
@@ -51,6 +55,7 @@ public class MaintenanceController {
      * Get a single issue with full work order history.
      */
     @GetMapping("/issues/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'TECHNICIAN')")
     public ResponseEntity<MaintenanceIssueResponse> getIssueById(
             @PathVariable Long id) {
 
@@ -90,6 +95,7 @@ public class MaintenanceController {
      * Get all work order attempts for an issue.
      */
     @GetMapping("/issues/{issueId}/work-orders")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<List<MaintenanceWorkOrderResponse>> getWorkOrdersByIssue(
             @PathVariable Long issueId) {
 
@@ -109,6 +115,19 @@ public class MaintenanceController {
     }
 
     // ----------------------------------------------------------------
+    /**
+     * GET /api/maintenance/issues/reported-by/{employeeId}
+     * Get all issues reported by a specific employee.
+     */
+    @GetMapping("/issues/reported-by/{employeeId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
+    public ResponseEntity<List<MaintenanceIssueResponse>> getIssuesByReporter(
+            @PathVariable Long employeeId) {
+        
+        identityService.verifyEmployeeMatch(employeeId);
+        return ResponseEntity.ok(maintenanceService.getIssuesByReporter(employeeId));
+    }
+
     // WORK ORDER ENDPOINTS
     // ----------------------------------------------------------------
 
@@ -188,9 +207,11 @@ public class MaintenanceController {
      * Get all work orders assigned to a specific technician.
      */
     @GetMapping("/work-orders/technician/{technicianId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'TECHNICIAN')")
     public ResponseEntity<List<MaintenanceWorkOrderResponse>> getWorkOrdersByTechnician(
             @PathVariable Long technicianId) {
-
+        
+        identityService.verifyTechnicianMatch(technicianId);
         return ResponseEntity.ok(maintenanceService.getWorkOrdersByTechnician(technicianId));
     }
 
@@ -203,6 +224,7 @@ public class MaintenanceController {
      * Get complete maintenance history for an asset.
      */
     @GetMapping("/assets/{assetId}/history")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<MaintenanceHistoryResponse> getAssetMaintenanceHistory(
             @PathVariable Long assetId) {
 

@@ -24,6 +24,9 @@ public class Asset extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false, unique = true)
     private String assetCode;
 
@@ -73,3 +76,4 @@ public class Asset extends BaseEntity {
     @JoinColumn(name = "vendor_id")
     private Vendor vendor;
 }
+

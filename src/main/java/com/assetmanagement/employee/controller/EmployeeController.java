@@ -17,6 +17,7 @@ import java.util.List;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     @PostMapping
     public ResponseEntity<EmployeeResponse> createEmployee(
@@ -29,13 +30,32 @@ public class EmployeeController {
 
     @GetMapping("/{id}")
     public ResponseEntity<EmployeeResponse> getEmployeeById(@PathVariable Long id) {
+        identityService.verifyEmployeeMatch(id);
 
         return ResponseEntity.ok(employeeService.getEmployeeById(id));
     }
 
-    @GetMapping
-    public ResponseEntity<List<EmployeeResponse>> getAllEmployees() {
+    @GetMapping("/me")
+    public ResponseEntity<EmployeeResponse> getCurrentEmployee(java.security.Principal principal) {
+        if (principal == null || principal.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(employeeService.getCurrentEmployee(principal.getName()));
+    }
 
+    @PutMapping("/me")
+    public ResponseEntity<EmployeeResponse> updateCurrentEmployee(
+            java.security.Principal principal,
+            @Valid @RequestBody com.assetmanagement.employee.dto.EmployeeSelfUpdateRequest request) {
+        if (principal == null || principal.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(employeeService.updateCurrentEmployee(principal.getName(), request));
+    }
+
+    @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<List<EmployeeResponse>> getAllEmployees() {
         return ResponseEntity.ok(employeeService.getAllEmployees());
     }
 
@@ -43,15 +63,12 @@ public class EmployeeController {
     public ResponseEntity<EmployeeResponse> updateEmployee(
             @PathVariable Long id,
             @Valid @RequestBody EmployeeRequest request) {
-
         return ResponseEntity.ok(employeeService.updateEmployee(id, request));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEmployee(@PathVariable Long id) {
-
         employeeService.deleteEmployee(id);
-
         return ResponseEntity.noContent().build();
     }
 }

@@ -16,4 +16,8 @@ public interface EmployeeService {
     EmployeeResponse updateEmployee(Long id, EmployeeRequest request);
 
     void deleteEmployee(Long id);
+    
+    EmployeeResponse getCurrentEmployee(String email);
+
+    EmployeeResponse updateCurrentEmployee(String email, com.assetmanagement.employee.dto.EmployeeSelfUpdateRequest request);
 }

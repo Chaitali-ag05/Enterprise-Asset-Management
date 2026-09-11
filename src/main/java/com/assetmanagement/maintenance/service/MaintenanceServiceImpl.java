@@ -36,6 +36,8 @@ public class MaintenanceServiceImpl implements MaintenanceService {
     private final AssetRepository assetRepository;
     private final EmployeeRepository employeeRepository;
     private final MaintenanceMapper mapper;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
+    private final com.assetmanagement.asset.assignment.service.AssignmentService assignmentService;
 
     // ========================================================================
     // 1. REPORT ISSUE
@@ -56,12 +58,18 @@ public class MaintenanceServiceImpl implements MaintenanceService {
                     "Asset already has an open maintenance issue. Resolve the existing issue first.");
         }
 
-        Employee reporter = getActiveEmployee(request.getReporterId());
-
-        // Validate reporter ownership: Employee can only report an issue for an asset assigned to them
-        if (asset.getAssignedEmployee() != null
+        Employee reporter = identityService.getCurrentEmployee();
+        
+        // ADMIN/MANAGER can report for any asset. Otherwise, must be assigned to them.
+        boolean isAdminOrManager = identityService.hasAnyRole("ADMIN", "MANAGER");
+        
+        if (!isAdminOrManager && asset.getAssignedEmployee() != null 
                 && !asset.getAssignedEmployee().getId().equals(reporter.getId())) {
-            throw new BadRequestException("Employee can only report an issue for an asset assigned to them.");
+            throw new org.springframework.security.access.AccessDeniedException("Access denied. You can only report issues for assets assigned to you.");
+        }
+        
+        if (isAdminOrManager && request.getReporterId() != null) {
+            reporter = employeeRepository.findById(request.getReporterId()).orElse(reporter);
         }
 
         String title = (request.title() != null && !request.title().isBlank())
@@ -118,6 +126,15 @@ public class MaintenanceServiceImpl implements MaintenanceService {
             throw new BadRequestException("Cannot assign a technician to a closed issue.");
         }
 
+        boolean hasActiveWorkOrder = workOrderRepository.findByMaintenanceIssueIdOrderByIdAsc(issueId).stream()
+                .anyMatch(wo -> wo.getStatus() == WorkOrderStatus.ASSIGNED 
+                             || wo.getStatus() == WorkOrderStatus.PENDING_ACCEPTANCE 
+                             || wo.getStatus() == WorkOrderStatus.ACCEPTED 
+                             || wo.getStatus() == WorkOrderStatus.IN_PROGRESS);
+        if (hasActiveWorkOrder) {
+            throw new BadRequestException("Issue already has an active work order.");
+        }
+
         // Validate technician
         Employee technician = employeeRepository.findById(request.technicianId())
                 .orElseThrow(() -> new ResourceNotFoundException("Technician not found."));
@@ -126,16 +143,8 @@ public class MaintenanceServiceImpl implements MaintenanceService {
             throw new BadRequestException("Technician is not active.");
         }
 
-        // Validate manager if provided
-        Employee manager = technician;
-        if (request.managerId() != null) {
-            manager = employeeRepository.findById(request.managerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found."));
-
-            if (manager.getStatus() != EmployeeStatus.ACTIVE) {
-                throw new BadRequestException("Manager is not active.");
-            }
-        }
+        // Set the assignedBy manager from the authenticated identity
+        Employee manager = identityService.getCurrentEmployee();
 
         MaintenanceWorkOrder workOrder = MaintenanceWorkOrder.builder()
                 .workOrderCode(generateWorkOrderCode())
@@ -203,7 +212,14 @@ public class MaintenanceServiceImpl implements MaintenanceService {
     @Override
     public MaintenanceWorkOrderResponse respondToWorkOrder(Long workOrderId, RespondWorkOrderRequest request) {
         if (request.action() == WorkOrderResponseAction.ACCEPT) {
-            return startWorkOrder(workOrderId);
+            MaintenanceWorkOrder workOrder = getWorkOrder(workOrderId);
+            if (workOrder.getStatus() != WorkOrderStatus.PENDING_ACCEPTANCE && workOrder.getStatus() != WorkOrderStatus.ASSIGNED) {
+                throw new BadRequestException("Cannot accept work order with status: " + workOrder.getStatus());
+            }
+            workOrder.setStatus(WorkOrderStatus.ACCEPTED);
+            workOrder.setAcceptedAt(LocalDateTime.now());
+            MaintenanceWorkOrder saved = workOrderRepository.save(workOrder);
+            return mapper.toWorkOrderResponse(saved);
         } else {
             return rejectWorkOrder(workOrderId, new RejectWorkOrderRequest(request.rejectionReason()));
         }
@@ -326,10 +342,14 @@ public class MaintenanceServiceImpl implements MaintenanceService {
     public MaintenanceWorkOrderResponse applyWorkOrderDecision(Long workOrderId, ManagerDecisionRequest request) {
         MaintenanceWorkOrder workOrder = getWorkOrder(workOrderId);
 
-        if (workOrder.getStatus() != WorkOrderStatus.NOT_REPAIRABLE) {
-            throw new BadRequestException(
-                    "Manager decision can only be applied when status is NOT_REPAIRABLE. Current: "
-                            + workOrder.getStatus());
+        if (request.decision() == ManagerDecision.APPROVE_REPAIR) {
+            if (workOrder.getStatus() != WorkOrderStatus.COMPLETED) {
+                throw new BadRequestException("Manager can only approve repairs for COMPLETED work orders. Current: " + workOrder.getStatus());
+            }
+        } else {
+            if (workOrder.getStatus() != WorkOrderStatus.NOT_REPAIRABLE) {
+                throw new BadRequestException("Manager decision " + request.decision() + " can only be applied when status is NOT_REPAIRABLE. Current: " + workOrder.getStatus());
+            }
         }
 
         applyManagerDecision(workOrder.getMaintenanceIssue().getId(), request);
@@ -340,18 +360,29 @@ public class MaintenanceServiceImpl implements MaintenanceService {
     public MaintenanceIssueResponse applyManagerDecision(Long issueId, ManagerDecisionRequest request) {
         MaintenanceIssue issue = getIssue(issueId);
 
-        if (issue.getStatus() != IssueStatus.NOT_REPAIRABLE) {
-            throw new BadRequestException(
-                    "Manager decision can only be applied to NOT_REPAIRABLE issues. Current: "
-                            + issue.getStatus());
+        if (request.decision() == ManagerDecision.APPROVE_REPAIR) {
+            if (issue.getStatus() != IssueStatus.COMPLETED) {
+                throw new BadRequestException("Manager can only approve repairs for COMPLETED issues. Current: " + issue.getStatus());
+            }
+        } else {
+            if (issue.getStatus() != IssueStatus.NOT_REPAIRABLE) {
+                throw new BadRequestException("Manager decision " + request.decision() + " can only be applied to NOT_REPAIRABLE issues. Current: " + issue.getStatus());
+            }
         }
 
         Asset asset = issue.getAsset();
 
-        if (request.decision() == ManagerDecision.RETIRE) {
+        if (request.decision() == ManagerDecision.APPROVE_REPAIR) {
+            issue.setStatus(IssueStatus.RESOLVED);
+            // Asset is already ASSIGNED or AVAILABLE from the completeRepair step, but we can affirm it.
+            if (request.notes() != null && !request.notes().isBlank()) {
+                issue.setResolutionNotes(issue.getResolutionNotes() + " | Manager Notes: " + request.notes());
+            }
+        } else if (request.decision() == ManagerDecision.RETIRE) {
             asset.setAssignedEmployee(null);
             asset.setStatus(AssetStatus.RETIRED);
             issue.setStatus(IssueStatus.RESOLVED_RETIRED);
+            assignmentService.autoCloseAssetAssignment(asset.getId(), "Asset RETIRED via maintenance decision.");
             issue.setResolvedAt(LocalDateTime.now());
             issue.setResolutionNotes("Asset RETIRED by manager."
                     + (request.notes() != null ? " Notes: " + request.notes() : ""));
@@ -359,6 +390,7 @@ public class MaintenanceServiceImpl implements MaintenanceService {
             asset.setAssignedEmployee(null);
             asset.setStatus(AssetStatus.RETIRED);
             issue.setStatus(IssueStatus.RESOLVED_REPLACED);
+            assignmentService.autoCloseAssetAssignment(asset.getId(), "Asset flagged for REPLACEMENT via maintenance decision.");
             issue.setResolvedAt(LocalDateTime.now());
             issue.setResolutionNotes("Asset flagged for REPLACEMENT by manager."
                     + (request.notes() != null ? " Notes: " + request.notes() : ""));
@@ -424,8 +456,11 @@ public class MaintenanceServiceImpl implements MaintenanceService {
     }
 
     private MaintenanceWorkOrder getWorkOrder(Long workOrderId) {
-        return workOrderRepository.findById(workOrderId)
+        MaintenanceWorkOrder workOrder = workOrderRepository.findById(workOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Work order not found."));
+        // Fix IDOR #3: Verify Technician Ownership
+        identityService.verifyTechnicianMatch(workOrder.getTechnician().getId());
+        return workOrder;
     }
 
     private Employee getActiveEmployee(Long employeeId) {
@@ -441,12 +476,18 @@ public class MaintenanceServiceImpl implements MaintenanceService {
 
     private String generateIssueCode() {
         MaintenanceIssue last = issueRepository.findTopByOrderByIdDesc().orElse(null);
-        if (last == null) {
+        if (last == null || last.getIssueCode() == null) {
             return "MNT0001";
         }
         String lastCode = last.getIssueCode();
-        int num = Integer.parseInt(lastCode.substring(3));
-        return String.format("MNT%04d", num + 1);
+        try {
+            if (lastCode.startsWith("MNT") && lastCode.length() > 3) {
+                int num = Integer.parseInt(lastCode.substring(3));
+                return String.format("MNT%04d", num + 1);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return "MNT" + String.format("%04d", (last.getId() != null ? last.getId() + 1 : 1));
     }
 
     private String generateWorkOrderCode() {
@@ -465,5 +506,12 @@ public class MaintenanceServiceImpl implements MaintenanceService {
             long count = workOrderRepository.count();
             return String.format("WO%04d", count + 1);
         }
+    }
+    @Override
+    public List<MaintenanceIssueResponse> getIssuesByReporter(Long employeeId) {
+        return issueRepository.findAll().stream()
+                .filter(issue -> issue.getReportedBy() != null && issue.getReportedBy().getId().equals(employeeId))
+                .map(mapper::toIssueResponse)
+                .collect(java.util.stream.Collectors.toList());
     }
 }

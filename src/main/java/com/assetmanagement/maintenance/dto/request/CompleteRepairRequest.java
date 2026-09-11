@@ -7,8 +7,6 @@ import java.math.BigDecimal;
 
 public record CompleteRepairRequest(
 
-        Long technicianId,
-
         Boolean isRepairable,
 
         @Size(max = 2000, message = "Resolution notes cannot exceed 2000 characters.")

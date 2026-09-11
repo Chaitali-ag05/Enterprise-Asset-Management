@@ -11,12 +11,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 @RestController
 @RequestMapping("/api/assets")
 @RequiredArgsConstructor
 public class AssetController {
 
     private final AssetService assetService;
+    private final com.assetmanagement.auth.service.IdentityService identityService;
 
     @PostMapping
     public ResponseEntity<AssetResponse> createAsset(
@@ -28,6 +31,7 @@ public class AssetController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<AssetResponse> getAssetById(
             @PathVariable Long id) {
 
@@ -37,10 +41,22 @@ public class AssetController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<List<AssetResponse>> getAllAssets() {
 
         return ResponseEntity.ok(
                 assetService.getAllAssets()
+        );
+    }
+
+    @GetMapping("/employee/{employeeId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
+    public ResponseEntity<List<AssetResponse>> getAssetsByEmployee(
+            @PathVariable Long employeeId) {
+        
+        identityService.verifyEmployeeMatch(employeeId);
+        return ResponseEntity.ok(
+                assetService.getAssetsByEmployeeId(employeeId)
         );
     }
 
