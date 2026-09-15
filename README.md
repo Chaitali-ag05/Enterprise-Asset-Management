@@ -34,6 +34,10 @@ Reporting
 
 ## Screenshots
 
+### Login
+<img width="550" alt="Admin Dashboard" src="https://github.com/user-attachments/assets/71243d4f-abd5-40d1-a48e-466425c0544d" />
+
+
 ### Admin Dashboard
 
 <img width="622" height="579" alt="image" src="https://github.com/user-attachments/assets/0f4803f7-2b44-4ded-ab0e-ba6c008caff1" />
@@ -55,10 +59,6 @@ Reporting
 ### Reports & Analytics
 
 <img width="631" height="525" alt="image" src="https://github.com/user-attachments/assets/301ac500-0373-479d-88d8-616efc37c919" />
-
-
-### Login
-<img width="550" alt="Admin Dashboard" src="https://github.com/user-attachments/assets/71243d4f-abd5-40d1-a48e-466425c0544d" />
 
 
 ## Technology Stack
